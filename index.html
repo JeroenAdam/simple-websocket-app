@@ -16,6 +16,22 @@
       }
     }
   </script>
+  <!-- Custom Scrollbar Styles -->
+  <style>
+    /* WebKit (Chrome, Safari, Edge) */
+    #messages::-webkit-scrollbar { width: 6px; }
+    #messages::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    #messages::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+    /* Firefox */
+    #messages { scrollbar-width: thin; scrollbar-color: #475569 transparent; }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body class="bg-slate-900 text-slate-200 min-h-screen flex items-center justify-center font-sans">
 
@@ -97,7 +113,7 @@
 
     if (type === 'sent') {
       return `
-        <div class="self-end max-w-[85%] flex flex-col items-end animate-[fadeIn_0.2s_ease-out]">
+        <div class="self-end flex flex-col items-end animate-[fadeIn_0.2s_ease-out]">
           <div class="bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm shadow-md break-words leading-relaxed">
             ${text}
           </div>
@@ -107,7 +123,7 @@
 
     // Received / User
     return `
-      <div class="self-start max-w-[85%] flex flex-col items-start animate-[fadeIn_0.2s_ease-out]">
+      <div class="self-start flex flex-col items-start animate-[fadeIn_0.2s_ease-out]">
         <div class="bg-slate-700 text-slate-100 px-4 py-2 rounded-2xl rounded-tl-sm shadow-md break-words leading-relaxed">
           ${text}
         </div>
