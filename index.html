@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebSocket Chat</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* ── App Container ────────────────────────────── */
+    .app {
+      width: 480px;
+      max-width: 95vw;
+      background: #1e293b;
+      border-radius: 16px;
+      box-shadow: 0 25px 60px rgba(0,0,0,.5);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 80vh;
+    }
+
+    /* ── Header ───────────────────────────────────── */
+    .header {
+      padding: 16px 20px;
+      background: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #334155;
+    }
+
+    .header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #f8fafc;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .75rem;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: #334155;
+      color: #94a3b8;
+      transition: all .3s;
+    }
+
+    .status-badge.connected {
+      background: #064e3b;
+      color: #6ee7b7;
+    }
+
+    .status-badge.disconnected {
+      background: #450a0a;
+      color: #fca5a5;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .connected .status-dot { animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: .4; }
+    }
+
+    /* ── Messages Area ────────────────────────────── */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      scroll-behavior: smooth;
+    }
+
+    #messages::-webkit-scrollbar { width: 6px; }
+    #messages::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+    .msg {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: .9rem;
+      line-height: 1.5;
+      word-break: break-word;
+      animation: fadeIn .2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.sent {
+      align-self: flex-end;
+      background: #2563eb;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .msg.received {
+      align-self: flex-start;
+      background: #334155;
+      color: #e2e8f0;
+      border-bottom-left-radius: 4px;
+    }
+
+    .msg.system {
+      align-self: center;
+      background: transparent;
+      color: #64748b;
+      font-size: .8rem;
+      font-style: italic;
+      text-align: center;
+      max-width: 100%;
+    }
+
+    .msg .timestamp {
+      display: block;
+      font-size: .65rem;
+      margin-top: 4px;
+      opacity: .6;
+    }
+
+    /* ── Input Area ───────────────────────────────── */
+    .input-area {
+      padding: 16px 20px;
+      background: #0f172a;
+      border-top: 1px solid #334155;
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      background: #1e293b;
+      color: #f8fafc;
+      font-size: .9rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .input-area input:focus {
+      border-color: #2563eb;
+    }
+
+    .input-area input:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .btn:active { transform: scale(.96); }
+
+    #connectBtn {
+      background: #2563eb;
+      color: #fff;
+    }
+
+    #connectBtn:hover { background: #1d4ed8; }
+
+    #sendBtn {
+      background: #0ea5e9;
+      color: #fff;
+    }
+
+    #sendBtn:hover { background: #0284c7; }
+    #sendBtn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Connection Config ────────────────────────── */
+    .config {
+      padding: 12px 20px;
+      background: #0f172a;
+      border-top: 1px solid #334155;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .config label {
+      font-size: .75rem;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    .config input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #f8fafc;
+      font-size: .8rem;
+      outline: none;
+    }
+
+    .config input:focus { border-color: #2563eb; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <h1>⚡ WebSocket Chat</h1>
+    <span id="statusBadge" class="status-badge disconnected">
+      <span class="status-dot"></span>
+      <span id="statusText">Disconnected</span>
+    </span>
+  </div>
+
+  <!-- Messages -->
+  <div id="messages"></div>
+
+  <!-- URL Config (hidden when connected) -->
+  <div class="config" id="configBar">
+    <label for="wsUrl">WS URL:</label>
+    <input id="wsUrl" type="text" value="ws://192.168.0.1" placeholder="ws://192.168.0.1" />
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <button id="connectBtn" class="btn">Connect</button>
+    <input id="msgInput" type="text" placeholder="Type a message…" disabled />
+    <button id="sendBtn" class="btn" disabled>Send</button>
+  </div>
+</div>
+
+<!-- ── Application Script ────────────────────────── -->
+<script>
+(() => {
+  // ── DOM refs ────────────────────────────────────
+  const messagesEl   = document.getElementById('messages');
+  const msgInput     = document.getElementById('msgInput');
+  const sendBtn      = document.getElementById('sendBtn');
+  const connectBtn   = document.getElementById('connectBtn');
+  const statusBadge  = document.getElementById('statusBadge');
+  const statusText   = document.getElementById('statusText');
+  const wsUrlInput   = document.getElementById('wsUrl');
+  const configBar    = document.getElementById('configBar');
+
+  // ── State ───────────────────────────────────────
+  let ws = null;
+  let reconnectTimer = null;
+  const RECONNECT_DELAY = 3000;
+
+  // ── Helpers ─────────────────────────────────────
+  function timestamp() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function addMessage(text, type = 'system') {
+    const div = document.createElement('div');
+    div.className = `msg ${type}`;
+    div.innerHTML = `${text}<span class="timestamp">${timestamp()}</span>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function setStatus(state) {
+    statusBadge.className = `status-badge ${state}`;
+    statusText.textContent = state === 'connected' ? 'Connected' : 'Disconnected';
+  }
+
+  function setInputsEnabled(enabled) {
+    msgInput.disabled   = !enabled;
+    sendBtn.disabled    = !enabled;
+    wsUrlInput.disabled = enabled;
+    connectBtn.textContent = enabled ? 'Disconnect' : 'Connect';
+  }
+
+  // ── WebSocket Logic ─────────────────────────────
+  function connect() {
+    const url = wsUrlInput.value.trim();
+    if (!url) return addMessage('Please enter a WebSocket URL.', 'system');
+
+    disconnect(); // clean up any existing connection
+
+    addMessage(`Connecting to ${url}…`, 'system');
+    setStatus('disconnected');
+
+    try {
+      ws = new WebSocket(url);
+    } catch (err) {
+      addMessage(`Invalid URL: ${err.message}`, 'system');
+      return;
+    }
+
+    ws.onopen = () => {
+      setStatus('connected');
+      setInputsEnabled(true);
+      addMessage('Connected! You can now send messages.', 'system');
+      configBar.style.display = 'none';
+    };
+
+    // ✅ UPDATED: Parse incoming payloads to show names correctly
+    ws.onmessage = (event) => {
+      const raw = event.data;
+      
+      if (raw.startsWith('[system] ')) {
+        // Strip [system] prefix for cleaner UI
+        addMessage(raw.slice(9), 'system');
+      } else if (raw.startsWith('[') && raw.includes('] ')) {
+        // Extract name and message from [username] message format
+        const splitIdx = raw.indexOf('] ');
+        const name = raw.substring(1, splitIdx);
+        const text = raw.substring(splitIdx + 2);
+        addMessage(`[${name}] ${text}`, 'received');
+      } else {
+        // Fallback for unexpected formats
+        addMessage(raw, 'received');
+      }
+    };
+
+    ws.onerror = () => {
+      // onerror fires before onClose — we let onClose handle UI cleanup
+    };
+
+    ws.onclose = (event) => {
+      setStatus('disconnected');
+      setInputsEnabled(false);
+      configBar.style.display = 'flex';
+
+      if (!event.wasClean) {
+        addMessage(`Connection lost (code ${event.code}). Reconnecting in ${RECONNECT_DELAY / 1000}s…`, 'system');
+        scheduleReconnect();
+      } else {
+        addMessage('Disconnected by server.', 'system');
+      }
+    };
+  }
+
+  function disconnect() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (ws) {
+      ws.close(1000, 'Client disconnect');
+      ws = null;
+    }
+    setStatus('disconnected');
+    setInputsEnabled(false);
+    configBar.style.display = 'flex';
+  }
+
+  function scheduleReconnect() {
+    reconnectTimer = setTimeout(() => connect(), RECONNECT_DELAY);
+  }
+
+  function sendMessage() {
+    const text = msgInput.value.trim();
+    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(text);
+    addMessage(text, 'sent');
+    msgInput.value = '';
+    msgInput.focus();
+  }
+
+  // ── Event Listeners ─────────────────────────────
+  connectBtn.addEventListener('click', () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      disconnect();
+    } else {
+      connect();
+    }
+  });
+
+  sendBtn.addEventListener('click', sendMessage);
+
+  msgInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  // ── Boot ────────────────────────────────────────
+  addMessage('Welcome! Enter a WebSocket URL and click Connect.', 'system');
+})();
+</script>
+
+</body>
+</html>
