@@ -34,6 +34,7 @@ const clients = new Map();
 // IP to username mapping (adjust as needed)
 const ipToName = {
   '127.0.0.1': 'youssef',
+  '192.168.0.1': 'youssef',
   '192.168.0.2': 'adam'
 };
 
