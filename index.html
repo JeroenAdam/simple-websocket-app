@@ -61,7 +61,7 @@
 <body class="bg-slate-900 text-slate-200 min-h-screen flex items-center justify-center font-sans p-4">
 
   <!-- Split Pane Container -->
-  <div class="w-[70%] h-[85vh] grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div class="w-[72%] h-[85vh] grid grid-cols-1 lg:grid-cols-2 gap-4">
     
     <!-- Notes Pane (Now Left) -->
     <div class="bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-700">
@@ -137,10 +137,9 @@
     placeholder: 'Start typing...',
     modules: {
       toolbar: [
-        [{ 'header': [1, 2, 3, false] }],
-        ['bold', 'italic', 'underline', 'blockquote'],
+        [{ 'header': [1, 2, 3, false] }, 'bold', 'italic', 'underline', 'blockquote'],
         [{ 'color': [] }, { 'background': [] }],
-        [{ 'list': 'bullet' }],
+        [{ 'list': 'bullet' }, { 'align': [] }],
         ['link', 'image', 'video'],
         ['clean']
       ]
