@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WebSocket Chat</title>
-  <!-- Tailwind CSS via CDN -->
+  <title>WebSocket Chat & Notes</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -16,69 +16,101 @@
       }
     }
   </script>
+  <!-- Quill 2.0 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
   <style>
     /* Scrollbar */
-    #messages::-webkit-scrollbar { width: 6px; }
-    #messages::-webkit-scrollbar-track { background: transparent; }
-    #messages::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-    #messages::-webkit-scrollbar-thumb:hover { background: #64748b; }
-    #messages { scrollbar-width: thin; scrollbar-color: #475569 transparent; }
+    #messages::-webkit-scrollbar, .ql-container::-webkit-scrollbar { width: 6px; }
+    #messages::-webkit-scrollbar-track, .ql-container::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb, .ql-container::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    #messages::-webkit-scrollbar-thumb:hover, .ql-container::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    #messages, .ql-container { scrollbar-width: thin; scrollbar-color: #475569 transparent; }
     
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* Lightbox Styles */
+    /* Lightbox */
     #lightbox { transition: opacity 0.2s ease; }
     #lightbox.hidden { display: none; opacity: 0; pointer-events: none; }
     #lightbox:not(.hidden) { display: flex; opacity: 1; }
     #lightboxImg { transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
     #lightbox.hidden #lightboxImg { transform: scale(0.95); }
     #lightbox:not(.hidden) #lightboxImg { transform: scale(1); }
+
+    /* Quill Dark Theme Overrides */
+    .ql-toolbar { background: #1e293b !important; border-bottom: 1px solid #334155 !important; }
+	.ql-toolbar.ql-snow { border: none !important; }
+    .ql-container { background: #0f172a !important; border: none !important; color: #e2e8f0 !important; }
+    .ql-editor { min-height: 60vh; font-size: 15px; }
+	.ql-editing { left: 1rem !important; }
+    .ql-snow .ql-stroke { stroke: #94a3b8 !important; }
+    .ql-snow .ql-fill { fill: #94a3b8 !important; }
+    .ql-snow .ql-picker-label { color: #94a3b8 !important; }
+    .ql-snow .ql-active { color: #60a5fa !important; }
+    .ql-snow .ql-active .ql-stroke { stroke: #60a5fa !important; }
+    .ql-picker-options { background: #1e293b !important; border: 1px solid #334155 !important; }
+    .ql-picker-item { color: #94a3b8 !important; }
+    .ql-tooltip { background: #1e293b !important; border: 1px solid #334155 !important; color: #e2e8f0 !important; }
+    .ql-tooltip input { background: transparent !important; color: #e2e8f0 !important; border: 1px solid #334155 !important; }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-200 min-h-screen flex items-center justify-center font-sans">
+<body class="bg-slate-900 text-slate-200 min-h-screen flex items-center justify-center font-sans p-4">
 
-  <!-- App Container -->
-  <div class="w-full max-w-[480px] h-[80vh] bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col relative border border-slate-700">
+  <!-- Split Pane Container -->
+  <div class="w-[70%] h-[85vh] grid grid-cols-1 lg:grid-cols-2 gap-4">
     
-    <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
-      <h1 class="text-lg font-semibold text-white flex items-center gap-2">
-        <span>⚡</span> WebSocket Chat
-      </h1>
-      <div id="statusBadge" class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-colors duration-300 bg-slate-700 text-slate-400">
-        <span class="w-2 h-2 rounded-full bg-current"></span>
-        <span id="statusText">Disconnected</span>
-      </div>
-    </header>
-
-    <div id="messages" class="flex-1 overflow-y-auto p-5 flex flex-col gap-3 scroll-smooth"></div>
-
-    <div id="configBar" class="flex items-center gap-2 px-5 py-3 bg-slate-900 border-t border-slate-700 shrink-0">
-      <label for="wsUrl" class="text-xs text-slate-500 font-medium uppercase tracking-wide">WS URL:</label>
-      <input id="wsUrl" type="text" value="ws://192.168.0.1" placeholder="ws://192.168.0.1" 
-             class="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50" />
+    <!-- Notes Pane (Now Left) -->
+    <div class="bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-700">
+      <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
+        <h1 class="text-lg font-semibold text-white flex items-center gap-2"><span>📝</span> Notes</h1>
+        <span id="saveStatus" class="text-xs text-slate-500">Auto-saved</span>
+      </header>
+      <div id="editor" class="flex-1 overflow-hidden"></div>
     </div>
 
-    <div class="p-4 bg-slate-900 border-t border-slate-700 shrink-0">
-      <div class="flex gap-2">
-        <button id="connectBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700 active:scale-95">Connect</button>
-        <input id="msgInput" type="text" placeholder="Type a message or paste an image…" disabled 
-               class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" />
-        <button id="sendBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-sky-500 text-white hover:bg-sky-600 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">Send</button>
+    <!-- Chat Pane (Now Right) -->
+    <div class="bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-700">
+      <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
+        <h1 class="text-lg font-semibold text-white flex items-center gap-2"><span>💬</span> Chat</h1>
+        <div id="statusBadge" class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-colors duration-300 bg-slate-700 text-slate-400">
+          <span class="w-2 h-2 rounded-full bg-current"></span>
+          <span id="statusText">Disconnected</span>
+        </div>
+      </header>
+
+      <div id="messages" class="flex-1 overflow-y-auto p-5 flex flex-col gap-3 scroll-smooth"></div>
+
+      <div id="configBar" class="flex items-center gap-2 px-5 py-3 bg-slate-900 border-t border-slate-700 shrink-0">
+        <label for="wsUrl" class="text-xs text-slate-500 font-medium uppercase tracking-wide">WS URL:</label>
+        <input id="wsUrl" type="text" value="ws://192.168.0.1" placeholder="ws://192.168.0.1" 
+               class="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50" />
+      </div>
+
+      <div class="p-4 bg-slate-900 border-t border-slate-700 shrink-0">
+        <div class="flex gap-2">
+          <button id="connectBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700 active:scale-95">Connect</button>
+          <input id="msgInput" type="text" placeholder="Type a message or paste an image…" disabled 
+                 class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" />
+          <button id="sendBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-sky-500 text-white hover:bg-sky-600 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">Send</button>
+        </div>
       </div>
     </div>
+
   </div>
 
-  <!-- Lightbox Modal (Outside main container to avoid overflow clipping) -->
+  <!-- Lightbox Modal -->
   <div id="lightbox" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <button id="lightboxClose" class="absolute top-4 right-4 text-white hover:text-red-400 transition-colors w-8 h-8 flex items-center justify-center rounded-full bg-slate-900/50 border border-slate-700">✕</button>
     <img id="lightboxImg" src="" alt="Full Image" class="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain" />
   </div>
 
+<!-- ── Scripts ─────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
 <script>
 (() => {
+  // DOM refs
   const messagesEl   = document.getElementById('messages');
   const msgInput     = document.getElementById('msgInput');
   const sendBtn      = document.getElementById('sendBtn');
@@ -87,17 +119,48 @@
   const statusText   = document.getElementById('statusText');
   const wsUrlInput   = document.getElementById('wsUrl');
   const configBar    = document.getElementById('configBar');
-  
-  // Lightbox refs
   const lightbox     = document.getElementById('lightbox');
   const lightboxImg  = document.getElementById('lightboxImg');
   const lightboxClose= document.getElementById('lightboxClose');
+  const saveStatus   = document.getElementById('saveStatus');
 
   let ws = null;
   let reconnectTimer = null;
   const RECONNECT_DELAY = 3000;
-  const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB limit
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
+  // ── Quill Editor Setup ───────────────────────────
+  const quill = new Quill('#editor', {
+    theme: 'snow',
+    placeholder: 'Start typing your notes...',
+    modules: {
+      toolbar: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'blockquote'],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'list': 'bullet' }],
+        ['link', 'image', 'video'],
+        ['clean']
+      ]
+    }
+  });
+
+  // Load saved notes
+  const savedNotes = localStorage.getItem('chat-notes');
+  if (savedNotes) quill.root.innerHTML = savedNotes;
+
+  // Auto-save with debounce
+  let saveTimeout;
+  quill.on('text-change', () => {
+    saveStatus.textContent = 'Saving...';
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      localStorage.setItem('chat-notes', quill.root.innerHTML);
+      saveStatus.textContent = 'Auto-saved';
+    }, 800);
+  });
+
+  // ── Helpers ──────────────────────────────────────
   function timestamp() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
@@ -106,6 +169,12 @@
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  function parseLinks(text) {
+    let safe = escapeHtml(text);
+    const urlRegex = /((?:https?):\/\/[^\s<>"{}|\\^`\[\]]+)/g;
+    return safe.replace(urlRegex, `<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline break-all">$1</a>`);
   }
 
   function createMessageHTML(text, type) {
@@ -127,10 +196,9 @@
       }
     }
 
-    // Note: Removed onclick, using event delegation instead for cleaner code & security
     const content = isImage 
       ? `<img src="${text}" alt="Shared Image" class="max-w-full max-h-[300px] rounded-lg object-contain cursor-pointer chat-image hover:opacity-90 transition-opacity" />`
-      : escapeHtml(text);
+      : parseLinks(text);
 
     const bubbleClass = type === 'sent' 
       ? "bg-blue-600 text-white rounded-tr-sm" 
@@ -194,21 +262,15 @@
     addMessage(payload, 'sent');
   }
 
-  // ── WebSocket Logic ─────────────────────────────
+  // ── WebSocket Logic ──────────────────────────────
   function connect() {
     const url = wsUrlInput.value.trim();
     if (!url) return addMessage('Please enter a WebSocket URL.', 'system');
-
     disconnect();
     addMessage(`Connecting to ${url}…`, 'system');
     setStatus('disconnected');
 
-    try {
-      ws = new WebSocket(url);
-    } catch (err) {
-      addMessage(`Invalid URL: ${err.message}`, 'system');
-      return;
-    }
+    try { ws = new WebSocket(url); } catch (err) { addMessage(`Invalid URL: ${err.message}`, 'system'); return; }
 
     ws.onopen = () => {
       setStatus('connected');
@@ -220,22 +282,14 @@
 
     ws.onmessage = (event) => {
       const raw = event.data;
-      
-      if (raw.startsWith('[img]')) {
-        addMessage(raw.slice(5), 'received');
-        return;
-      }
-      
-      if (raw.startsWith('[system] ')) {
-        addMessage(raw.slice(9), 'system');
-      } else if (raw.startsWith('[') && raw.includes('] ')) {
+      if (raw.startsWith('[img]')) { addMessage(raw.slice(5), 'received'); return; }
+      if (raw.startsWith('[system] ')) { addMessage(raw.slice(9), 'system'); }
+      else if (raw.startsWith('[') && raw.includes('] ')) {
         const splitIdx = raw.indexOf('] ');
         const name = raw.substring(1, splitIdx);
         const text = raw.substring(splitIdx + 2);
         addMessage(`[${name}] ${text}`, 'received');
-      } else {
-        addMessage(raw, 'received');
-      }
+      } else { addMessage(raw, 'received'); }
     };
 
     ws.onerror = () => {};
@@ -246,9 +300,7 @@
       if (!event.wasClean) {
         addMessage(`Connection lost (code ${event.code}). Reconnecting in ${RECONNECT_DELAY / 1000}s…`, 'system');
         scheduleReconnect();
-      } else {
-        addMessage('Disconnected by server.', 'system');
-      }
+      } else { addMessage('Disconnected by server.', 'system'); }
     };
   }
 
@@ -260,11 +312,9 @@
     configBar.style.display = 'flex';
   }
 
-  function scheduleReconnect() {
-    reconnectTimer = setTimeout(() => connect(), RECONNECT_DELAY);
-  }
+  function scheduleReconnect() { reconnectTimer = setTimeout(() => connect(), RECONNECT_DELAY); }
 
-  // ── Event Listeners ─────────────────────────────
+  // ── Event Listeners ──────────────────────────────
   connectBtn.addEventListener('click', () => {
     if (ws && ws.readyState === WebSocket.OPEN) disconnect();
     else connect();
@@ -287,19 +337,16 @@
     }
   });
 
-  // ── Clipboard Image Handling ────────────────────
   msgInput.addEventListener('paste', (e) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         e.preventDefault();
         const file = items[i].getAsFile();
-        
         if (file.size > MAX_IMAGE_SIZE) {
           addMessage(`⚠️ Image too large. Max size: ${MAX_IMAGE_SIZE / 1024 / 1024}MB`, 'system');
           return;
         }
-
         const reader = new FileReader();
         reader.onload = (event) => sendPayload(event.target.result);
         reader.readAsDataURL(file);
@@ -308,33 +355,13 @@
     }
   });
 
-  // ── Lightbox Logic ──────────────────────────────
-  function openLightbox(src) {
-    lightboxImg.src = src;
-    lightbox.classList.remove('hidden');
-    document.body.style.overflow = 'hidden'; // Prevent background scrolling
-  }
-
-  function closeLightbox() {
-    lightbox.classList.add('hidden');
-    document.body.style.overflow = '';
-    setTimeout(() => lightboxImg.src = '', 200); // Clear src after animation
-  }
-
-  // Event delegation for dynamically added images
-  messagesEl.addEventListener('click', (e) => {
-    if (e.target.classList.contains('chat-image')) {
-      openLightbox(e.target.src);
-    }
-  });
-
+  // Lightbox
+  function openLightbox(src) { lightboxImg.src = src; lightbox.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+  function closeLightbox() { lightbox.classList.add('hidden'); document.body.style.overflow = ''; setTimeout(() => lightboxImg.src = '', 200); }
+  messagesEl.addEventListener('click', (e) => { if (e.target.classList.contains('chat-image')) openLightbox(e.target.src); });
   lightboxClose.addEventListener('click', closeLightbox);
-  lightbox.addEventListener('click', (e) => {
-    if (e.target === lightbox) closeLightbox();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) closeLightbox();
-  });
+  lightbox.addEventListener('click', (e) => { if (e.target === lightbox) closeLightbox(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) closeLightbox(); });
 
   addMessage('Welcome! Enter a WebSocket URL and click Connect.', 'system');
 })();
