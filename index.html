@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebSocket Chat & Notes</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -20,11 +20,11 @@
   <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
   <style>
     /* Scrollbar */
-    #messages::-webkit-scrollbar, .ql-container::-webkit-scrollbar { width: 6px; }
-    #messages::-webkit-scrollbar-track, .ql-container::-webkit-scrollbar-track { background: transparent; }
-    #messages::-webkit-scrollbar-thumb, .ql-container::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-    #messages::-webkit-scrollbar-thumb:hover, .ql-container::-webkit-scrollbar-thumb:hover { background: #64748b; }
-    #messages, .ql-container { scrollbar-width: thin; scrollbar-color: #475569 transparent; }
+    #messages::-webkit-scrollbar, .ql-container::-webkit-scrollbar, #logContentMain::-webkit-scrollbar { width: 6px; }
+    #messages::-webkit-scrollbar-track, .ql-container::-webkit-scrollbar-track, #logContentMain::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb, .ql-container::-webkit-scrollbar-thumb, #logContentMain::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    #messages::-webkit-scrollbar-thumb:hover, .ql-container::-webkit-scrollbar-thumb:hover, #logContentMain::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    #messages, .ql-container, #logContentMain { scrollbar-width: thin; scrollbar-color: #475569 transparent; }
     
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
@@ -55,55 +55,93 @@
     .ql-picker-item { color: #94a3b8 !important; }
     .ql-tooltip { background: #1e293b !important; border: 1px solid #334155 !important; color: #e2e8f0 !important; }
     .ql-tooltip input { background: transparent !important; color: #e2e8f0 !important; border: 1px solid #334155 !important; }
-
   </style>
 </head>
 <body class="bg-slate-900 text-slate-200 min-h-screen flex items-center justify-center font-sans p-4">
 
-  <!-- Split Pane Container -->
-  <div class="w-[72%] h-[85vh] grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <!-- Sidebar Toggle -->
+  <button id="sidebarToggle" class="fixed top-4 left-4 z-40 p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors shadow-lg">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>
+  </button>
+
+  <!-- Sidebar Overlay -->
+  <div id="sidebarOverlay" class=""></div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-54 bg-slate-800 border-r border-slate-700 transform -translate-x-full transition-transform duration-300 ease-in-out z-50 flex flex-col shadow-2xl">
+    <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
+      <h4 class="text-lg font-semibold text-white flex items-center gap-2">Chat History&nbsp;&nbsp;&nbsp;</h4>
+      <button id="closeSidebar" class="text-slate-400 hover:text-white transition-colors p-1 rounded-md hover:bg-slate-700">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </header>
+
+    <!-- Log List (Tabs) -->
+    <div id="logList" class="flex-1 overflow-y-auto p-3 space-y-1">
+      <div class="text-center text-slate-500 mt-10">Click a log to view</div>
+    </div>
+  </aside>
+
+  <!-- Main Content Wrapper -->
+  <div id="mainContainer" class="w-[72%] h-[85vh] transition-all duration-300">
     
-    <!-- Notes Pane (Now Left) -->
-    <div class="bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-700">
-      <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
-        <h1 class="text-lg font-semibold text-white flex items-center gap-2"><span>📝</span> Notes</h1>
-        <span id="saveStatus" class="text-xs text-slate-500">Auto-saved</span>
-      </header>
-      <div id="editor" class="flex-1 overflow-hidden"></div>
+    <!-- Live View (Notes + Chat) -->
+    <div id="liveView" class="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
+      
+      <!-- Notes Pane -->
+      <div class="bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-700">
+        <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
+          <h1 class="text-lg font-semibold text-white flex items-center gap-2"><span>📝</span> Notes</h1>
+          <span id="saveStatus" class="text-xs text-slate-500">Auto-saved</span>
+        </header>
+        <div id="editor" class="flex-1 overflow-hidden"></div>
+      </div>
+
+      <!-- Chat Pane -->
+      <div class="bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-700">
+        <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
+          <h1 class="text-lg font-semibold text-white flex items-center gap-2"><span>💬</span> Chat</h1>
+          <div id="statusBadge" class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-colors duration-300 bg-slate-700 text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-current"></span>
+            <span id="statusText">Disconnected</span>
+          </div>
+        </header>
+
+        <div id="messages" class="flex-1 overflow-y-auto p-5 flex flex-col gap-3 scroll-smooth"></div>
+
+        <div id="configBar" class="flex items-center gap-2 px-5 py-3 bg-slate-900 border-t border-slate-700 shrink-0">
+          <label for="wsUrl" class="text-xs text-slate-500 font-medium uppercase tracking-wide">WS URL:</label>
+          <input id="wsUrl" type="text" value="ws://192.168.0.1" placeholder="ws://192.168.0.1" 
+                 class="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50" />
+        </div>
+
+        <div class="p-4 bg-slate-900 border-t border-slate-700 shrink-0">
+          <div class="flex gap-2">
+            <button id="connectBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700 active:scale-95">Connect</button>
+            <input id="msgInput" type="text" placeholder="Type a message or paste an image/video…" disabled 
+                   class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" />
+            <button id="sendBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-sky-500 text-white hover:bg-sky-600 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">Send</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Chat Pane (Now Right) -->
-    <div class="bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-700">
+    <!-- Log Viewer (Hidden initially) -->
+    <div id="logViewerMain" class="hidden flex flex-col h-full bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden">
       <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
-        <h1 class="text-lg font-semibold text-white flex items-center gap-2"><span>💬</span> Chat</h1>
-        <div id="statusBadge" class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-colors duration-300 bg-slate-700 text-slate-400">
-          <span class="w-2 h-2 rounded-full bg-current"></span>
-          <span id="statusText">Disconnected</span>
-        </div>
+        <h2 class="text-lg font-semibold text-white flex items-center gap-2"><span>📜</span> <span id="logDateDisplay">Select a log</span></h2>
+        <button id="backToLive" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          Go back
+        </button>
       </header>
-
-      <div id="messages" class="flex-1 overflow-y-auto p-5 flex flex-col gap-3 scroll-smooth"></div>
-
-      <div id="configBar" class="flex items-center gap-2 px-5 py-3 bg-slate-900 border-t border-slate-700 shrink-0">
-        <label for="wsUrl" class="text-xs text-slate-500 font-medium uppercase tracking-wide">WS URL:</label>
-        <input id="wsUrl" type="text" value="ws://192.168.0.1" placeholder="ws://192.168.0.1" 
-               class="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50" />
-      </div>
-
-      <div class="p-4 bg-slate-900 border-t border-slate-700 shrink-0">
-        <div class="flex gap-2">
-          <button id="connectBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700 active:scale-95">Connect</button>
-          <input id="msgInput" type="text" placeholder="Type a message or paste an image…" disabled 
-                 class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" />
-          <button id="sendBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-sky-500 text-white hover:bg-sky-600 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">Send</button>
-        </div>
-      </div>
+      <div id="logContentMain" class="flex-1 overflow-y-auto p-6 space-y-2 text-sm font-mono"></div>
     </div>
 
   </div>
 
   <!-- Lightbox Modal -->
-  <div id="lightbox" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div id="lightbox" class="fixed inset-0 z-30 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <button id="lightboxClose" class="absolute top-4 right-4 text-white hover:text-red-400 transition-colors w-8 h-8 flex items-center justify-center rounded-full bg-slate-900/50 border border-slate-700">✕</button>
     <img id="lightboxImg" src="" alt="Full Image" class="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain" />
   </div>
@@ -126,10 +164,24 @@
   const lightboxClose= document.getElementById('lightboxClose');
   const saveStatus   = document.getElementById('saveStatus');
 
+  // Sidebar & View refs
+  const sidebar      = document.getElementById('sidebar');
+  const overlay      = document.getElementById('sidebarOverlay');
+  const toggleBtn    = document.getElementById('sidebarToggle');
+  const closeBtn     = document.getElementById('closeSidebar');
+  const logList      = document.getElementById('logList');
+  const liveView     = document.getElementById('liveView');
+  const logViewerMain= document.getElementById('logViewerMain');
+  const logDateDisplay = document.getElementById('logDateDisplay');
+  const backToLiveBtn= document.getElementById('backToLive');
+  const logContentMain = document.getElementById('logContentMain');
+
   let ws = null;
   let reconnectTimer = null;
   const RECONNECT_DELAY = 3000;
   const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+  const MAX_VIDEO_SIZE = 10 * 1024 * 1024;
+  const API_BASE = 'http://localhost:80';
 
   // ── Quill Editor Setup ───────────────────────────
   const quill = new Quill('#editor', {
@@ -146,11 +198,9 @@
     }
   });
 
-  // Load saved notes
   const savedNotes = localStorage.getItem('chat-notes');
   if (savedNotes) quill.root.innerHTML = savedNotes;
 
-  // Auto-save with debounce
   let saveTimeout;
   quill.on('text-change', () => {
     saveStatus.textContent = 'Saving...';
@@ -186,20 +236,27 @@
     }
 
     let isImage = text.startsWith('data:image/');
+    let isVideo = text.startsWith('data:video/');
     let username = '';
     
-    if (!isImage && text.includes('data:image/')) {
-      const match = text.match(/^\[(.*?)\]\s*(data:image\/.*)$/);
+    if (!isImage && !isVideo) {
+      const match = text.match(/^\[(.*?)\]\s*(data:(image|video)\/.*)$/);
       if (match) {
-        isImage = true;
         username = match[1];
         text = match[2];
+        isImage = text.startsWith('data:image/');
+        isVideo = text.startsWith('data:video/');
       }
     }
 
-    const content = isImage 
-      ? `<img src="${text}" alt="Shared Image" class="max-w-full max-h-[300px] rounded-lg object-contain cursor-pointer chat-image hover:opacity-90 transition-opacity" />`
-      : parseLinks(text);
+    let content;
+    if (isImage) {
+      content = `<img src="${text}" alt="Shared Image" class="max-w-full max-h-[300px] rounded-lg object-contain cursor-pointer chat-image hover:opacity-90 transition-opacity" />`;
+    } else if (isVideo) {
+      content = `<video src="${text}" controls class="max-w-full max-h-[300px] rounded-lg shadow-md bg-black" playsinline webkit-playsinline></video>`;
+    } else {
+      content = parseLinks(text);
+    }
 
     const bubbleClass = type === 'sent' 
       ? "bg-blue-600 text-white rounded-tr-sm" 
@@ -263,6 +320,88 @@
     addMessage(payload, 'sent');
   }
 
+  // ── Sidebar & View Logic ─────────────────────────
+  function openSidebar() {
+    sidebar.classList.remove('-translate-x-full');
+    overlay.classList.remove('hidden');
+    if (logList.children.length === 0 || logList.querySelector('.text-center')) fetchLogs();
+  }
+
+  function closeSidebar() {
+    sidebar.classList.add('-translate-x-full');
+    overlay.classList.add('hidden');
+  }
+
+  async function fetchLogs() {
+    logList.innerHTML = '<div class="p-6 text-center text-slate-500 animate-pulse">Loading logs...</div>';
+    try {
+      const res = await fetch(`${API_BASE}/api/logs`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const files = await res.json();
+      logList.innerHTML = '';
+      if (files.length === 0) {
+        logList.innerHTML = '<div class="p-6 text-center text-slate-500">No logs found yet.</div>';
+        return;
+      }
+      files.forEach(file => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full py-2.5 rounded-lg hover:bg-slate-700 text-sm text-slate-300 transition-colors flex justify-center items-center group';
+        const date = file.replace('websocket-', '').replace('.log', '');
+        btn.innerHTML = `<span class="group-hover:text-white">📅 ${date}</span>`;
+        btn.onclick = () => { loadLog(file, date); };
+        logList.appendChild(btn);
+      });
+    } catch (e) {
+      console.error('Sidebar fetch error:', e);
+      logList.innerHTML = `<div class="p-4 text-center text-red-400 text-sm">Failed to load logs.<br><small>Ensure Node server is running on port 80</small></div>`;
+    }
+  }
+
+
+  async function loadLog(filename, displayDate) {
+    logDateDisplay.textContent = `${displayDate}`;
+    logContentMain.innerHTML = '<div class="p-6 text-center text-slate-500 animate-pulse">Loading content...</div>';
+    
+    // Switch views
+    liveView.classList.add('hidden');
+    logViewerMain.classList.remove('hidden');
+    
+    try {
+      const res = await fetch(`${API_BASE}/api/logs/${filename}`);
+      if (!res.ok) throw new Error('Failed to load');
+      const text = await res.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      logContentMain.innerHTML = lines.map(formatLogLine).join('');
+      setTimeout(() => logContentMain.scrollTop = logContentMain.scrollHeight, 50);
+    } catch (e) {
+      console.error('Log content fetch error:', e);
+      logContentMain.innerHTML = `<div class="p-4 text-red-400 text-sm">Failed to load log content.</div>`;
+    }
+  }
+
+  function formatLogLine(line) {
+    const match = line.match(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s*(.*)$/);
+    if (!match) return `<div class="text-slate-500 text-xs mb-1">${escapeHtml(line)}</div>`;
+    const [, time, content] = match;
+    const formattedContent = escapeHtml(content).replace(/(📨|🖼️|🎥|⚠️)/g, '<span class="text-yellow-400">$1</span>');
+    return `
+      <div class="flex gap-3 text-xs mb-2 border-b border-slate-700/50 pb-2 last:border-0">
+        <span class="text-slate-500 font-mono shrink-0 pt-0.5">${time}</span>
+        <span class="text-slate-300 break-all leading-relaxed">${formattedContent}</span>
+      </div>`;
+  }
+
+  toggleBtn.addEventListener('click', openSidebar);
+  closeBtn.addEventListener('click', closeSidebar);
+  overlay.addEventListener('click', closeSidebar);
+  
+  // Go back restores live view momentarily
+  backToLiveBtn.addEventListener('click', () => {
+    logViewerMain.classList.add('hidden');
+    liveView.classList.remove('hidden');
+	closeSidebar();
+  });
+
   // ── WebSocket Logic ──────────────────────────────
   function connect() {
     const url = wsUrlInput.value.trim();
@@ -276,7 +415,7 @@
     ws.onopen = () => {
       setStatus('connected');
       setInputsEnabled(true);
-      addMessage('Connected! You can now send messages or paste images.', 'system');
+      addMessage('Connected! You can now send messages or paste images/videos.', 'system');
       configBar.style.display = 'none';
       setTimeout(() => msgInput.focus(), 200);
     };
@@ -284,6 +423,7 @@
     ws.onmessage = (event) => {
       const raw = event.data;
       if (raw.startsWith('[img]')) { addMessage(raw.slice(5), 'received'); return; }
+      if (raw.startsWith('[vid]')) { addMessage(raw.slice(5), 'received'); return; }
       if (raw.startsWith('[system] ')) { addMessage(raw.slice(9), 'system'); }
       else if (raw.startsWith('[') && raw.includes('] ')) {
         const splitIdx = raw.indexOf('] ');
@@ -341,11 +481,23 @@
   msgInput.addEventListener('paste', (e) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
+      const type = items[i].type;
+      if (type.indexOf('image') !== -1) {
         e.preventDefault();
         const file = items[i].getAsFile();
         if (file.size > MAX_IMAGE_SIZE) {
           addMessage(`⚠️ Image too large. Max size: ${MAX_IMAGE_SIZE / 1024 / 1024}MB`, 'system');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => sendPayload(event.target.result);
+        reader.readAsDataURL(file);
+        return;
+      } else if (type.indexOf('video') !== -1) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file.size > MAX_VIDEO_SIZE) {
+          addMessage(`⚠️ Video too large. Max size: ${MAX_VIDEO_SIZE / 1024 / 1024}MB`, 'system');
           return;
         }
         const reader = new FileReader();
