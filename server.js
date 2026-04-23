@@ -13,7 +13,6 @@ const logger = winston.createLogger({
   ),
   transports: [
     new winston.transports.Console(),
-    
     new Transport({
       filename: 'logs/websocket-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
@@ -28,56 +27,55 @@ const logger = winston.createLogger({
 const PORT = process.env.PORT || 80;
 const wss = new WebSocketServer({ port: PORT, host: '0.0.0.0' });
 
-// Map to store client data: ws -> { name, ip }
 const clients = new Map();
-
-// IP to username mapping (adjust as needed)
 const ipToName = {
   '127.0.0.1': 'youssef',
   '192.168.0.1': 'youssef',
   '192.168.0.2': 'adam'
 };
 
-// Removed server start log per your request
-// logger.info(`🚀 Server listening on ws://localhost:${PORT}`);
-
 wss.on('connection', (ws) => {
   const rawIP = ws._socket?.remoteAddress || 'unknown';
-  // Normalize IPv4-mapped IPv6 addresses (Node.js often returns ::ffff:127.0.0.1)
   const clientIP = rawIP.replace('::ffff:', '');
   const clientName = ipToName[clientIP] || 'unknown';
   
   clients.set(ws, { name: clientName, ip: clientIP });
 
-  // Removed system connection logs per your request
-
   ws.on('message', (data) => {
     const msg = data.toString();
     const { name } = clients.get(ws) || {};
     
-    logger.info(`📨 ${name}: ${msg}`);
-    
-    broadcastToOthers(ws, msg);
+    // Detect Base64 images
+    if (msg.startsWith('data:image/')) {
+      logger.info(`🖼️ ${name} sent an image (${Math.round(msg.length / 1024)}KB)`);
+      broadcastImage(ws, msg);
+    } else {
+      logger.info(`📨 ${name}: ${msg}`);
+      broadcastToOthers(ws, msg);
+    }
   });
 
-  ws.on('close', () => {
-    clients.delete(ws);
-    // Removed system disconnection log per your request
-  });
-
+  ws.on('close', () => clients.delete(ws));
   ws.on('error', (err) => {
-    logger.error(`⚠️  WebSocket error: ${err.message}`);
+    logger.error(`⚠️ WebSocket error: ${err.message}`);
     clients.delete(ws);
   });
 });
 
 function broadcastToOthers(sender, message) {
-  // Safely extract the sender's name from our Map
   const senderName = sender && clients.has(sender) ? clients.get(sender).name : 'Unknown';
-  
-  // Send [username] for chat, [system] for system events
   const payload = sender ? `[${senderName}] ${message}` : `[system] ${message}`;
   
+  clients.forEach((data, client) => {
+    if (client !== sender && client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+    }
+  });
+}
+
+// New: Broadcast images with a clear marker so frontend can parse them
+function broadcastImage(sender, imageData) {
+  const payload = `[img]${imageData}`;
   clients.forEach((data, client) => {
     if (client !== sender && client.readyState === WebSocket.OPEN) {
       client.send(payload);

@@ -16,21 +16,26 @@
       }
     }
   </script>
-  <!-- Custom Scrollbar Styles -->
   <style>
-    /* WebKit (Chrome, Safari, Edge) */
+    /* Scrollbar */
     #messages::-webkit-scrollbar { width: 6px; }
     #messages::-webkit-scrollbar-track { background: transparent; }
     #messages::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
     #messages::-webkit-scrollbar-thumb:hover { background: #64748b; }
-
-    /* Firefox */
     #messages { scrollbar-width: thin; scrollbar-color: #475569 transparent; }
     
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+
+    /* Lightbox Styles */
+    #lightbox { transition: opacity 0.2s ease; }
+    #lightbox.hidden { display: none; opacity: 0; pointer-events: none; }
+    #lightbox:not(.hidden) { display: flex; opacity: 1; }
+    #lightboxImg { transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+    #lightbox.hidden #lightboxImg { transform: scale(0.95); }
+    #lightbox:not(.hidden) #lightboxImg { transform: scale(1); }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-200 min-h-screen flex items-center justify-center font-sans">
@@ -38,49 +43,42 @@
   <!-- App Container -->
   <div class="w-full max-w-[480px] h-[80vh] bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col relative border border-slate-700">
     
-    <!-- Header -->
     <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
       <h1 class="text-lg font-semibold text-white flex items-center gap-2">
         <span>⚡</span> WebSocket Chat
       </h1>
-      
-      <!-- Status Badge -->
       <div id="statusBadge" class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-colors duration-300 bg-slate-700 text-slate-400">
         <span class="w-2 h-2 rounded-full bg-current"></span>
         <span id="statusText">Disconnected</span>
       </div>
     </header>
 
-    <!-- Messages Area -->
-    <div id="messages" class="flex-1 overflow-y-auto p-5 flex flex-col gap-3 scroll-smooth">
-      <!-- Messages will be injected here by JS -->
-    </div>
+    <div id="messages" class="flex-1 overflow-y-auto p-5 flex flex-col gap-3 scroll-smooth"></div>
 
-    <!-- Connection Config (Hidden when connected) -->
     <div id="configBar" class="flex items-center gap-2 px-5 py-3 bg-slate-900 border-t border-slate-700 shrink-0">
       <label for="wsUrl" class="text-xs text-slate-500 font-medium uppercase tracking-wide">WS URL:</label>
-      <input id="wsUrl" type="text" value="ws://192.168.0.1" placeholder="ws://..." 
+      <input id="wsUrl" type="text" value="ws://192.168.0.1" placeholder="ws://192.168.0.1" 
              class="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50" />
     </div>
 
-    <!-- Input Area -->
     <div class="p-4 bg-slate-900 border-t border-slate-700 shrink-0">
       <div class="flex gap-2">
         <button id="connectBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700 active:scale-95">Connect</button>
-        
-        <input id="msgInput" type="text" placeholder="Type a message…" disabled 
+        <input id="msgInput" type="text" placeholder="Type a message or paste an image…" disabled 
                class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" />
-               
         <button id="sendBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-sky-500 text-white hover:bg-sky-600 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">Send</button>
       </div>
     </div>
-
   </div>
 
-<!-- ── Application Script ────────────────────────── -->
+  <!-- Lightbox Modal (Outside main container to avoid overflow clipping) -->
+  <div id="lightbox" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <button id="lightboxClose" class="absolute top-4 right-4 text-white hover:text-red-400 transition-colors w-8 h-8 flex items-center justify-center rounded-full bg-slate-900/50 border border-slate-700">✕</button>
+    <img id="lightboxImg" src="" alt="Full Image" class="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain" />
+  </div>
+
 <script>
 (() => {
-  // ── DOM refs ────────────────────────────────────
   const messagesEl   = document.getElementById('messages');
   const msgInput     = document.getElementById('msgInput');
   const sendBtn      = document.getElementById('sendBtn');
@@ -89,55 +87,72 @@
   const statusText   = document.getElementById('statusText');
   const wsUrlInput   = document.getElementById('wsUrl');
   const configBar    = document.getElementById('configBar');
+  
+  // Lightbox refs
+  const lightbox     = document.getElementById('lightbox');
+  const lightboxImg  = document.getElementById('lightboxImg');
+  const lightboxClose= document.getElementById('lightboxClose');
 
-  // ── State ───────────────────────────────────────
   let ws = null;
   let reconnectTimer = null;
   const RECONNECT_DELAY = 3000;
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB limit
 
-  // ── Helpers ─────────────────────────────────────
   function timestamp() {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  // Helper to create message HTML with Tailwind classes
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   function createMessageHTML(text, type) {
     const time = timestamp();
     
     if (type === 'system') {
-      return `
-        <div class="self-center text-xs italic text-slate-500 my-2">
-          ${text} <span class="opacity-50 mx-1">•</span> ${time}
-        </div>`;
+      return `<div class="self-center text-xs italic text-slate-500 my-2">${escapeHtml(text)} <span class="opacity-50 mx-1">•</span> ${time}</div>`;
     }
 
-    if (type === 'sent') {
-      return `
-        <div class="self-end flex flex-col items-end animate-[fadeIn_0.2s_ease-out]">
-          <div class="bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-sm shadow-md break-words leading-relaxed">
-            ${text}
-          </div>
-          <span class="text-[10px] text-slate-500 mt-1 mr-1">${time}</span>
-        </div>`;
+    let isImage = text.startsWith('data:image/');
+    let username = '';
+    
+    if (!isImage && text.includes('data:image/')) {
+      const match = text.match(/^\[(.*?)\]\s*(data:image\/.*)$/);
+      if (match) {
+        isImage = true;
+        username = match[1];
+        text = match[2];
+      }
     }
 
-    // Received / User
+    // Note: Removed onclick, using event delegation instead for cleaner code & security
+    const content = isImage 
+      ? `<img src="${text}" alt="Shared Image" class="max-w-full max-h-[300px] rounded-lg object-contain cursor-pointer chat-image hover:opacity-90 transition-opacity" />`
+      : escapeHtml(text);
+
+    const bubbleClass = type === 'sent' 
+      ? "bg-blue-600 text-white rounded-tr-sm" 
+      : "bg-slate-700 text-slate-100 rounded-tl-sm";
+    const alignClass = type === 'sent' ? "self-end items-end" : "self-start items-start";
+    const timeMargin = type === 'sent' ? "mr-1" : "ml-1";
+    const userLabel = username ? `<span class="text-xs text-slate-400 mb-1 block px-1">${username}</span>` : '';
+
     return `
-      <div class="self-start flex flex-col items-start animate-[fadeIn_0.2s_ease-out]">
-        <div class="bg-slate-700 text-slate-100 px-4 py-2 rounded-2xl rounded-tl-sm shadow-md break-words leading-relaxed">
-          ${text}
+      <div class="${alignClass} flex flex-col animate-[fadeIn_0.2s_ease-out]">
+        ${userLabel}
+        <div class="${bubbleClass} px-4 py-2 rounded-2xl shadow-md break-words leading-relaxed max-w-[85%]">
+          ${content}
         </div>
-        <span class="text-[10px] text-slate-500 mt-1 ml-1">${time}</span>
+        <span class="text-[10px] text-slate-500 mt-1 ${timeMargin}">${time}</span>
       </div>`;
   }
 
   function addMessage(text, type = 'system') {
     const div = document.createElement('div');
-    // We use innerHTML here because the string contains multiple elements (message bubble + timestamp)
     div.innerHTML = createMessageHTML(text, type);
     messagesEl.appendChild(div);
-    
-    // Scroll to bottom
     messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
   }
 
@@ -145,7 +160,6 @@
     if (state === 'connected') {
       statusBadge.className = "flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-colors duration-300 bg-emerald-900/50 text-emerald-400 border border-emerald-800";
       statusText.textContent = 'Connected';
-      // Pulse animation on the dot
       const dot = statusBadge.querySelector('span'); 
       if(dot) dot.classList.add('animate-pulse-slow');
     } else {
@@ -163,13 +177,21 @@
     
     if (enabled) {
       connectBtn.textContent = 'Disconnect';
-      connectBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-      connectBtn.classList.add('bg-red-900', 'text-red-200', 'hover:bg-red-800');
+      connectBtn.classList.replace('bg-blue-600', 'bg-red-900');
+      connectBtn.classList.replace('text-white', 'text-red-200');
+      connectBtn.classList.replace('hover:bg-blue-700', 'hover:bg-red-800');
     } else {
       connectBtn.textContent = 'Connect';
-      connectBtn.classList.remove('bg-red-900', 'text-red-200', 'hover:bg-red-800');
-      connectBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+      connectBtn.classList.replace('bg-red-900', 'bg-blue-600');
+      connectBtn.classList.replace('text-red-200', 'text-white');
+      connectBtn.classList.replace('hover:bg-red-800', 'hover:bg-blue-700');
     }
+  }
+
+  function sendPayload(payload) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(payload);
+    addMessage(payload, 'sent');
   }
 
   // ── WebSocket Logic ─────────────────────────────
@@ -177,8 +199,7 @@
     const url = wsUrlInput.value.trim();
     if (!url) return addMessage('Please enter a WebSocket URL.', 'system');
 
-    disconnect(); // clean up any existing connection
-
+    disconnect();
     addMessage(`Connecting to ${url}…`, 'system');
     setStatus('disconnected');
 
@@ -192,20 +213,22 @@
     ws.onopen = () => {
       setStatus('connected');
       setInputsEnabled(true);
-      addMessage('Connected! You can now send messages.', 'system');
-      configBar.style.display = 'none'; // Hide URL input on success
-      
-      // Focus the message input when connected
+      addMessage('Connected! You can now send messages or paste images.', 'system');
+      configBar.style.display = 'none';
       setTimeout(() => msgInput.focus(), 200);
     };
 
     ws.onmessage = (event) => {
       const raw = event.data;
       
+      if (raw.startsWith('[img]')) {
+        addMessage(raw.slice(5), 'received');
+        return;
+      }
+      
       if (raw.startsWith('[system] ')) {
         addMessage(raw.slice(9), 'system');
       } else if (raw.startsWith('[') && raw.includes('] ')) {
-        // Extract name and message
         const splitIdx = raw.indexOf('] ');
         const name = raw.substring(1, splitIdx);
         const text = raw.substring(splitIdx + 2);
@@ -215,15 +238,11 @@
       }
     };
 
-    ws.onerror = () => {
-      // handled in onclose mostly
-    };
-
+    ws.onerror = () => {};
     ws.onclose = (event) => {
       setStatus('disconnected');
       setInputsEnabled(false);
       configBar.style.display = 'flex';
-
       if (!event.wasClean) {
         addMessage(`Connection lost (code ${event.code}). Reconnecting in ${RECONNECT_DELAY / 1000}s…`, 'system');
         scheduleReconnect();
@@ -234,14 +253,8 @@
   }
 
   function disconnect() {
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    if (ws) {
-      ws.close(1000, 'Client disconnect');
-      ws = null;
-    }
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws) { ws.close(1000, 'Client disconnect'); ws = null; }
     setStatus('disconnected');
     setInputsEnabled(false);
     configBar.style.display = 'flex';
@@ -251,34 +264,80 @@
     reconnectTimer = setTimeout(() => connect(), RECONNECT_DELAY);
   }
 
-  function sendMessage() {
-    const text = msgInput.value.trim();
-    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(text);
-    addMessage(text, 'sent');
-    msgInput.value = '';
-    msgInput.focus();
-  }
-
   // ── Event Listeners ─────────────────────────────
   connectBtn.addEventListener('click', () => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      disconnect();
-    } else {
-      connect();
+    if (ws && ws.readyState === WebSocket.OPEN) disconnect();
+    else connect();
+  });
+
+  sendBtn.addEventListener('click', () => {
+    const text = msgInput.value.trim();
+    if (!text) return;
+    sendPayload(text);
+    msgInput.value = '';
+    msgInput.focus();
+  });
+
+  msgInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const text = msgInput.value.trim();
+      if (!text) return;
+      sendPayload(text);
+      msgInput.value = '';
     }
   });
 
-  sendBtn.addEventListener('click', sendMessage);
+  // ── Clipboard Image Handling ────────────────────
+  msgInput.addEventListener('paste', (e) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        
+        if (file.size > MAX_IMAGE_SIZE) {
+          addMessage(`⚠️ Image too large. Max size: ${MAX_IMAGE_SIZE / 1024 / 1024}MB`, 'system');
+          return;
+        }
 
-  msgInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage();
+        const reader = new FileReader();
+        reader.onload = (event) => sendPayload(event.target.result);
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
   });
 
-  // ── Boot ────────────────────────────────────────
+  // ── Lightbox Logic ──────────────────────────────
+  function openLightbox(src) {
+    lightboxImg.src = src;
+    lightbox.classList.remove('hidden');
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+  }
+
+  function closeLightbox() {
+    lightbox.classList.add('hidden');
+    document.body.style.overflow = '';
+    setTimeout(() => lightboxImg.src = '', 200); // Clear src after animation
+  }
+
+  // Event delegation for dynamically added images
+  messagesEl.addEventListener('click', (e) => {
+    if (e.target.classList.contains('chat-image')) {
+      openLightbox(e.target.src);
+    }
+  });
+
+  lightboxClose.addEventListener('click', closeLightbox);
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox) closeLightbox();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) closeLightbox();
+  });
+
   addMessage('Welcome! Enter a WebSocket URL and click Connect.', 'system');
 })();
 </script>
-
 </body>
 </html>
