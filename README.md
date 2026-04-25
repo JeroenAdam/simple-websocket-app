@@ -1,4 +1,6 @@
-My 10y. old son is learning a foreign language by in-game chatting with other players online. I'm available as his tutor. He needs quick answers, and pronunciation can be a barrier. So I (vibe) coded a simple chat app. My son now has a tool to ask written questions to his tutor. Our chat history will serve later as well.
+I built my 10y. old son a learning tool. He can get instant answers from his tutor (me) via chat, he can ask AI (local AI), he can take notes, manage his favorites, browse our chat history. Next step: from note taking to personal knowledge management. hashtag#EdTech hashtag#Homeschooling
 
-<img width="623" height="809" alt="image" src="https://github.com/user-attachments/assets/be7cbd88-cfef-4052-9fcc-678adae1e5e0" />
+It started with my son learning a foreign language and needing quick answers from his tutor (me) during in-game chatting with other players online. Pronunciation showed to be a barrier. So I (vibe) coded a simple chat app and added more features along the way.
+
+<img width="1834" height="904" alt="image" src="https://github.com/user-attachments/assets/6e6ae9d2-788e-4d17-8085-b6ed20c7db33" />
 
