@@ -20,12 +20,19 @@
   <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
   <style>
     /* Scrollbar */
-    #messages::-webkit-scrollbar, .ql-container::-webkit-scrollbar, #logContentMain::-webkit-scrollbar { width: 6px; }
-    #messages::-webkit-scrollbar-track, .ql-container::-webkit-scrollbar-track, #logContentMain::-webkit-scrollbar-track { background: transparent; }
-    #messages::-webkit-scrollbar-thumb, .ql-container::-webkit-scrollbar-thumb, #logContentMain::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-    #messages::-webkit-scrollbar-thumb:hover, .ql-container::-webkit-scrollbar-thumb:hover, #logContentMain::-webkit-scrollbar-thumb:hover { background: #64748b; }
-    #messages, .ql-container, #logContentMain { scrollbar-width: thin; scrollbar-color: #475569 transparent; }
-    
+    #messages::-webkit-scrollbar, .ql-container::-webkit-scrollbar, #logContentMain::-webkit-scrollbar, #logList::-webkit-scrollbar { width: 6px; }
+    #messages::-webkit-scrollbar-track, .ql-container::-webkit-scrollbar-track, #logContentMain::-webkit-scrollbar-track, #logList::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb, .ql-container::-webkit-scrollbar-thumb, #logContentMain::-webkit-scrollbar-thumb, #logList::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    #messages::-webkit-scrollbar-thumb:hover, .ql-container::-webkit-scrollbar-thumb:hover, #logContentMain::-webkit-scrollbar-thumb:hover, #logList::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    #messages, .ql-container, #logContentMain, #logList { scrollbar-width: thin; scrollbar-color: #475569 transparent; }
+ 
+    /* Shortcuts Manager Scrollbar */
+    #shortcutsSlots::-webkit-scrollbar { width: 6px; }
+    #shortcutsSlots::-webkit-scrollbar-track { background: transparent; }
+    #shortcutsSlots::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    #shortcutsSlots::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    #shortcutsSlots { scrollbar-width: thin; scrollbar-color: #475569 transparent; }
+ 
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -60,9 +67,38 @@
 <body class="bg-slate-900 text-slate-200 min-h-screen flex items-center justify-center font-sans p-4">
 
   <!-- Sidebar Toggle -->
-  <button id="sidebarToggle" class="fixed top-4 left-4 z-40 p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors shadow-lg">
+  <button id="sidebarToggle" title="Chat History" class="fixed top-4 left-4 z-40 p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors shadow-lg">
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>
   </button>
+
+  <!-- AI Chatbot Toggle -->
+  <button id="aiToggle" class="fixed top-4 left-16 z-40 p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors shadow-lg" title="AI Assistant">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+  </button>
+
+  <!-- Shortcuts Toolbar -->
+  <div id="shortcutsToolbar" class="fixed top-4 left-[8rem] z-40 flex items-center gap-2 opacity-95">
+    <!-- Shortcuts will be injected here by JS -->
+    <button id="addShortcutBtn" class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shadow-lg flex items-center justify-center" title="Manage Shortcuts">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </div>
+
+  <!-- Shortcuts Manager Modal -->
+  <div id="shortcutsManager" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+      <header class="flex items-center justify-between px-5 py-4 bg-slate-800 border-b border-slate-700">
+        <h2 class="text-lg font-semibold text-white">Shortcuts</h2>
+        <div class="flex gap-2">
+          <button id="cancelShortcuts" class="px-3 py-1.5 rounded-lg text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">Cancel</button>
+          <button id="saveShortcuts" class="px-3 py-1.5 rounded-lg text-sm bg-white hover:bg-slate-200 text-slate-900 font-medium transition-colors">Save</button>
+        </div>
+      </header>
+      <div id="shortcutsSlots" class="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+        <!-- 10 slots injected by JS -->
+      </div>
+    </div>
+  </div>
 
   <!-- Sidebar Overlay -->
   <div id="sidebarOverlay" class=""></div>
@@ -71,7 +107,7 @@
   <aside id="sidebar" class="fixed inset-y-0 left-0 w-54 bg-slate-800 border-r border-slate-700 transform -translate-x-full transition-transform duration-300 ease-in-out z-50 flex flex-col shadow-2xl">
     <header class="flex items-center justify-between px-5 py-4 bg-slate-900 border-b border-slate-700 shrink-0">
       <h4 class="text-lg font-semibold text-white flex items-center gap-2">Chat History&nbsp;&nbsp;&nbsp;</h4>
-      <button id="closeSidebar" class="text-slate-400 hover:text-white transition-colors p-1 rounded-md hover:bg-slate-700">
+      <button id="closeSidebar" class="text-slate-400 hover:text-white transition-colors p-1 rounded-md hover:bg-slate-700" title="Close">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
     </header>
@@ -82,8 +118,43 @@
     </div>
   </aside>
 
+  <!-- AI Chatbot Overlay -->
+  <div id="aiOverlay" class="fixed inset-0 z-[60] hidden bg-slate-900 flex flex-col">
+    <header class="flex items-center justify-between px-5 py-3 bg-slate-800 border-b border-slate-700 shrink-0">
+      <h2 class="text-lg font-semibold text-white flex items-center gap-2"><span>🤖</span> AI Assistant</h2>
+      <button id="closeAiBtn" class="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </header>
+    <iframe id="aiFrame" src="" class="flex-1 w-full h-full border-none bg-white" title="AI Chatbot" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+  </div>
+
+  <!-- Custom Emoji Dropdown -->
+  <div id="emojiDropdown" class="hidden fixed z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-3 w-64 grid grid-cols-6 gap-2 animate-[fadeIn_0.1s_ease-out]">
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="😀">😀</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="😂">😂</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="😍">😍</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="🤔">🤔</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="👍">👍</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="👎">👎</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="🔥">🔥</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="❤️">❤️</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="🎉">🎉</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="🚀">🚀</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="💡">💡</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="✅">✅</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="❌">❌</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="⚠️">⚠️</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="📌">📌</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="💬">💬</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="👀">👀</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="🙌">🙌</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="🤝">🤝</button>
+    <button class="emoji-opt p-2 hover:bg-slate-700 rounded text-lg transition-colors" data-emoji="💻">💻</button>
+  </div>
+
   <!-- Main Content Wrapper -->
-  <div id="mainContainer" class="w-[72%] h-[85vh] transition-all duration-300">
+  <div id="mainContainer" class="w-[72%] h-[85vh] py-4 transition-all duration-300">
     
     <!-- Live View (Notes + Chat) -->
     <div id="liveView" class="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
@@ -117,12 +188,18 @@
 
         <div class="p-4 bg-slate-900 border-t border-slate-700 shrink-0">
           <div class="flex gap-2">
-            <button id="connectBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700 active:scale-95">Connect</button>
+			<button id="connectBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700 active:scale-95" title="Connect">
+			  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+			</button>
+			<button id="emojiBtn" type="button" class="p-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Insert Emoji">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            </button>
             <input id="msgInput" type="text" placeholder="Type a message or paste an image/video…" disabled 
                    class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" />
             <button id="sendBtn" class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-sky-500 text-white hover:bg-sky-600 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">Send</button>
           </div>
         </div>
+
       </div>
     </div>
 
@@ -181,7 +258,9 @@
   const RECONNECT_DELAY = 3000;
   const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
   const MAX_VIDEO_SIZE = 10 * 1024 * 1024;
-  const API_BASE = 'http://localhost:80';
+
+  // Dynamically determine API base URL (works on localhost & LAN)
+  const API_BASE = window.location.origin.replace(/:\d+$/, ':80');
 
   // ── Quill Editor Setup ───────────────────────────
   const quill = new Quill('#editor', {
@@ -302,15 +381,24 @@
     wsUrlInput.disabled = enabled;
     
     if (enabled) {
-      connectBtn.textContent = 'Disconnect';
+      // ⚡ Disconnected: Lightning with diagonal slash
+      connectBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          <line x1="2" y1="2" x2="22" y2="22"/>
+        </svg>`;
       connectBtn.classList.replace('bg-blue-600', 'bg-red-900');
-      connectBtn.classList.replace('text-white', 'text-red-200');
       connectBtn.classList.replace('hover:bg-blue-700', 'hover:bg-red-800');
+      connectBtn.title = 'Disconnect';
     } else {
-      connectBtn.textContent = 'Connect';
+      // ⚡ Connected: Clean lightning bolt
+      connectBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>`;
       connectBtn.classList.replace('bg-red-900', 'bg-blue-600');
-      connectBtn.classList.replace('text-red-200', 'text-white');
       connectBtn.classList.replace('hover:bg-red-800', 'hover:bg-blue-700');
+      connectBtn.title = 'Connect';
     }
   }
 
@@ -357,7 +445,6 @@
     }
   }
 
-
   async function loadLog(filename, displayDate) {
     logDateDisplay.textContent = `${displayDate}`;
     logContentMain.innerHTML = '<div class="p-6 text-center text-slate-500 animate-pulse">Loading content...</div>';
@@ -380,14 +467,29 @@
   }
 
   function formatLogLine(line) {
-    const match = line.match(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s*(.*)$/);
+    let cleanLine = line.trim().replace(/\r/g, '').replace(/^\[?(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]?\s*/, '$1 ');
+    const match = cleanLine.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(.*)$/);
     if (!match) return `<div class="text-slate-500 text-xs mb-1">${escapeHtml(line)}</div>`;
+
     const [, time, content] = match;
-    const formattedContent = escapeHtml(content).replace(/(📨|🖼️|🎥|⚠️)/g, '<span class="text-yellow-400">$1</span>');
+    const isMediaNotification = /sent an? (image|video)/i.test(content);
+    const parts = content.split(/\s+/);
+    const emoji = parts[0] || '';
+    const username = (parts[1] || '').replace(/:$/, ''); 
+    const message = parts.slice(2).join(' ');
+    
+    const dimClass = isMediaNotification ? 'opacity-50' : '';
+    const textClass = isMediaNotification ? 'text-slate-400' : 'text-white';
+    const separator = content.includes(':') ? ':' : ' ';
+
     return `
       <div class="flex gap-3 text-xs mb-2 border-b border-slate-700/50 pb-2 last:border-0">
         <span class="text-slate-500 font-mono shrink-0 pt-0.5">${time}</span>
-        <span class="text-slate-300 break-all leading-relaxed">${formattedContent}</span>
+        <span class="break-all leading-relaxed">
+          <span class="text-yellow-400 ${dimClass}">${escapeHtml(emoji)}</span> 
+          <span class="text-slate-300 font-medium ${dimClass}">${escapeHtml(username)}${separator}</span> 
+          <span class="${textClass}">${escapeHtml(message)}</span>
+        </span>
       </div>`;
   }
 
@@ -395,12 +497,64 @@
   closeBtn.addEventListener('click', closeSidebar);
   overlay.addEventListener('click', closeSidebar);
   
-  // Go back restores live view momentarily
   backToLiveBtn.addEventListener('click', () => {
     logViewerMain.classList.add('hidden');
     liveView.classList.remove('hidden');
 	closeSidebar();
   });
+
+  // ── Custom Emoji Picker Logic (Opens Upwards) ───
+  const emojiBtn = document.getElementById('emojiBtn');
+  const emojiDropdown = document.getElementById('emojiDropdown');
+  const emojiOpts = document.querySelectorAll('.emoji-opt');
+
+  function positionEmojiDropdown() {
+    const rect = emojiBtn.getBoundingClientRect();
+    // Anchor the dropdown's bottom edge to the button's top edge + 8px gap
+    emojiDropdown.style.top = 'auto';
+    emojiDropdown.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+    emojiDropdown.style.left = `${rect.left}px`;
+  }
+
+  emojiBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    positionEmojiDropdown();
+    emojiDropdown.classList.toggle('hidden');
+  });
+
+  emojiOpts.forEach(opt => {
+    opt.addEventListener('click', () => {
+      msgInput.value += opt.dataset.emoji;
+      msgInput.focus();
+      emojiDropdown.classList.add('hidden');
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!emojiBtn.contains(e.target) && !emojiDropdown.contains(e.target)) {
+      emojiDropdown.classList.add('hidden');
+    }
+  });
+
+  // ── AI Overlay Logic ─────────────────────────────
+  const aiOverlay = document.getElementById('aiOverlay');
+  const aiToggle  = document.getElementById('aiToggle');
+  const closeAiBtn= document.getElementById('closeAiBtn');
+  const aiFrame   = document.getElementById('aiFrame');
+
+  function openAI() {
+    aiFrame.src = `http://${window.location.hostname}:8080`;
+    aiOverlay.classList.remove('hidden');
+    closeSidebar();
+  }
+
+  function closeAI() {
+    aiFrame.src = ''; 
+    aiOverlay.classList.add('hidden');
+  }
+
+  aiToggle.addEventListener('click', openAI);
+  closeAiBtn.addEventListener('click', closeAI);
 
   // ── WebSocket Logic ──────────────────────────────
   function connect() {
@@ -422,6 +576,9 @@
 
     ws.onmessage = (event) => {
       const raw = event.data;
+      if (!raw.startsWith('[system] ')) {
+        playNotificationSound();
+      }
       if (raw.startsWith('[img]')) { addMessage(raw.slice(5), 'received'); return; }
       if (raw.startsWith('[vid]')) { addMessage(raw.slice(5), 'received'); return; }
       if (raw.startsWith('[system] ')) { addMessage(raw.slice(9), 'system'); }
@@ -517,6 +674,112 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) closeLightbox(); });
 
   addMessage('Welcome! Enter a WebSocket URL and click Connect.', 'system');
+  
+  // ── Notification Sound ───────────────────────────
+  let audioCtx = null;
+  
+  function playNotificationSound() {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      // Soft "ding" sound
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
+      oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.15);
+    } catch (e) {
+      // Silently fail if audio isn't supported
+    }
+  }
+
+  // ── Shortcuts System ─────────────────────────────
+  const shortcutsToolbar = document.getElementById('shortcutsToolbar');
+  const addShortcutBtn   = document.getElementById('addShortcutBtn');
+  const shortcutsManager = document.getElementById('shortcutsManager');
+  const cancelShortcuts  = document.getElementById('cancelShortcuts');
+  const saveShortcuts    = document.getElementById('saveShortcuts');
+  const shortcutsSlots   = document.getElementById('shortcutsSlots');
+
+  let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+
+  function renderShortcuts() {
+    // Clear existing shortcut buttons (keep the + button)
+    Array.from(shortcutsToolbar.children).forEach(child => {
+      if (child.id !== 'addShortcutBtn') child.remove();
+    });
+
+    favorites.forEach((fav, index) => {
+      const btn = document.createElement('button');
+      btn.className = 'w-10 h-10 rounded-full bg-slate-800 border border-slate-700 overflow-hidden hover:scale-105 transition-transform shadow-lg';
+      btn.title = fav.url;
+      btn.onclick = () => window.open(fav.url, '_blank');
+      
+      const img = document.createElement('img');
+      img.src = `/api/favicon?url=${encodeURIComponent(fav.url)}`;
+      img.alt = 'favicon';
+      img.className = 'w-full h-full object-contain p-1.5';
+      img.onerror = () => { img.style.display = 'none'; btn.innerHTML = '<span class="text-xs text-slate-500">?</span>'; };
+      
+      btn.appendChild(img);
+      shortcutsToolbar.insertBefore(btn, addShortcutBtn);
+    });
+  }
+
+  function renderManagerSlots() {
+    shortcutsSlots.innerHTML = '';
+    for (let i = 0; i < 25; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'flex items-center gap-3 group';
+      slot.innerHTML = `
+        <span class="text-slate-600 cursor-grab active:cursor-grabbing">⋮⋮</span>
+        <input type="url" placeholder="https://example.com" value="${favorites[i]?.url || ''}" 
+               class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors">
+      `;
+      shortcutsSlots.appendChild(slot);
+    }
+  }
+
+  function openShortcutsManager() {
+    renderManagerSlots();
+    shortcutsManager.classList.remove('hidden');
+  }
+
+  function closeShortcutsManager() {
+    shortcutsManager.classList.add('hidden');
+  }
+
+  function saveShortcutsData() {
+    const inputs = shortcutsSlots.querySelectorAll('input[type="url"]');
+    const newFavs = Array.from(inputs)
+      .map(input => input.value.trim())
+      .filter(url => url.length > 0 && /^(https?:\/\/)/.test(url))
+      .slice(0, 25)
+      .map(url => ({ url }));
+      
+    favorites = newFavs;
+    localStorage.setItem('favorites', JSON.stringify(favorites));
+    renderShortcuts();
+    closeShortcutsManager();
+  }
+
+  addShortcutBtn.addEventListener('click', openShortcutsManager);
+  cancelShortcuts.addEventListener('click', closeShortcutsManager);
+  saveShortcuts.addEventListener('click', saveShortcutsData);
+
+  // Initial render
+  renderShortcuts();
+
 })();
 </script>
 </body>
